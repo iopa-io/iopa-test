@@ -1,0 +1,43 @@
+{
+  "name": "iopa-test",
+  "main": "index.js",
+  "description": "iopa-test is a collection of test stubs/harnesses for testing IOPA middleware",
+  "author": "iopa <build@iopa.io>",
+  "license": "Apache-2.0",
+  "maintainers": [
+    {
+      "name": "iopa",
+      "email": "build@iopa.io"
+    }
+  ],
+  "version": "1.2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iopa-io/iopa-test.git"
+  },
+  "dependencies": {
+    "iopa": "^1.2.0",
+    "iopa-common-stream": "^1.2.0"
+  },
+  "keywords": [
+    "limerun",
+    "iopa",
+    "stream",
+    "middleware",
+    "promise",
+    "framework"
+  ],
+  "engines": {
+    "node": ">= 4.0.0"
+  },
+  "scripts": {
+    "test": "mocha --reporter spec test",
+     "quick": "git add . -A && git commit -m 'dev test' && npm version patch && npm publish",
+   "typings": "tsd reinstall --overwrite --clean --config tools/tsd.json && tsd link"
+  },
+  "devDependencies": {
+    "mocha": "^2.3.2",
+    "mocha-junit-reporter": "^1.6.1",
+    "should": "^7.1.0"
+  }
+}
