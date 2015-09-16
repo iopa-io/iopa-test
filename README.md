@@ -54,4 +54,4 @@ server.connect("urn://localhost").then(function (client) {
  
 ``` 
        
-See [`iopa-mqtt`](https://nodei.co/npm/iopa-mqtt/) for a reference implementation of this repository
+See [`iopa-logger`](https://nodei.co/npm/iopa-logger/) for a reference implementation of this repository
