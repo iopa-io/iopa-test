@@ -53,6 +53,9 @@ function StubServer(options, appFunc) {
   EventEmitter.call(this);
   this._factory = new iopa.Factory(options);
   this._appFunc = appFunc;
+  
+  this._clientApp = new iopa.App(this._appFunc.properties);
+
  }
 
 util.inherits(StubServer, EventEmitter);
@@ -200,8 +203,7 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
 	
 	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
     
-   if (this._clientAppFunc)
-		   this._clientAppFunc(channelContext);
+   this._clientApp.build()(channelContext);
 
     return Promise.resolve(channelContext);
 };
@@ -253,6 +255,7 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
   var that = this;
    
    context[SERVER.ParentContext] = channelContext;
+   context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
     
   return context.using(function(ctx){
              var value = pipeline(ctx);
@@ -262,7 +265,7 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
 };
 
 StubServer.prototype.connectuse = function IOPAServer_connectuse(middleware) {
-   this._clientAppFunc = middleware;
+   this._clientApp.use(middleware);
 };
 
 /**
