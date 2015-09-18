@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+global.Promise = require('bluebird');
+
 const index = require('../index.js'),
     stubServer = index.stubServer;
 

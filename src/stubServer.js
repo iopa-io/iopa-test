@@ -52,11 +52,11 @@ function StubServer(options, appFunc) {
     
   EventEmitter.call(this);
   this._factory = new iopa.Factory(options);
+    
   this._appFunc = appFunc;
-  
-  this._clientApp = new iopa.App(this._appFunc.properties);
-
- }
+  this._connect = this._appFunc.connect || function(context){return Promise.resolve(context)};
+  this._dispatch = this._appFunc.dispatch || function(context){return Promise.resolve(context)};
+}
 
 util.inherits(StubServer, EventEmitter);
 
@@ -68,9 +68,8 @@ util.inherits(StubServer, EventEmitter);
  * @public 
  */
 StubServer.prototype.listen = function StubServer_listen() {
-   return this._listen.apply(this, arguments);
+   return true;
 };
-
 
 module.exports.createServer = function(options, appFunc){return new StubServer(options, appFunc);}
 
@@ -191,6 +190,8 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
   var channelResponse = channelContext.response;
  
 	channelContext[SERVER.Fetch] = StubServer_Fetch.bind(this, channelContext);
+  channelContext[SERVER.Dispatch] = this._dispatch;
+	
 	channelContext[SERVER.RawStream] = new iopaStream.OutgoingStream();
 	channelContext[SERVER.RawTransport] = channelContext[SERVER.RawStream];
 	channelContext[SERVER.LocalAddress] = "127.0.0.1";
@@ -200,12 +201,11 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
 	channelResponse[SERVER.RawTransport] = channelContext[SERVER.RawTransport];
 	channelResponse[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
 	channelResponse[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
+  channelContext.disconnect = channelContext.dispose;
 	
 	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
-    
-   this._clientApp.build()(channelContext);
 
-    return Promise.resolve(channelContext);
+   return this._connect(channelContext);
 };
 
 /**
@@ -251,21 +251,12 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
   response[IOPA.MessageId] = context[IOPA.MessageId] ;
   response[IOPA.Body] = response[SERVER.RawStream];
   response[IOPA.Method] = "REPLY";
- 
-  var that = this;
    
    context[SERVER.ParentContext] = channelContext;
    context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-    
-  return context.using(function(ctx){
-             var value = pipeline(ctx);
-             process.nextTick(function(){that.respond(ctx);});
-               return value;
-           });
-};
-
-StubServer.prototype.connectuse = function IOPAServer_connectuse(middleware) {
-   this._clientApp.use(middleware);
+     
+   return context.using(channelContext[SERVER.Dispatch](context).then(pipeline));
+ 
 };
 
 /**
