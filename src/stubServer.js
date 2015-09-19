@@ -254,9 +254,13 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
    
    context[SERVER.ParentContext] = channelContext;
    context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-     
-   return context.using(channelContext[SERVER.Dispatch](context).then(pipeline));
- 
+   var that = this;
+   
+  context.using(function(){
+      var value = channelContext[SERVER.Dispatch](context).then(pipeline);
+        process.nextTick(function(){that.respond(context)});
+        return value;
+  });
 };
 
 /**
