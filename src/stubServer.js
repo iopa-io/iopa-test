@@ -127,6 +127,8 @@ StubServer.prototype.respond = function(parentContext){
 	  var parentResponse = parentContext.response;
   
         var context = this._factory.createContext();
+        parentContext[SERVER.Factory].mergeCapabilities(context, parentContext);
+ 
         context[SERVER.TLS] = parentResponse[SERVER.TLS];
         context[SERVER.RemoteAddress] =parentResponse[SERVER.RemoteAddress];
         context[SERVER.RemotePort] = parentResponse[SERVER.RemotePort]
@@ -228,8 +230,10 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
   
   var channelResponse = channelContext.response;
 
-  var urlStr = channelContext[SERVER.OriginalUrl] + path;
-  var context = this._factory.createRequestResponse(urlStr, options);
+   var urlStr = channelContext[SERVER.OriginalUrl] + path;
+  var context = channelContext[SERVER.Factory].createRequestResponse(urlStr, options);
+  channelContext[SERVER.Factory].mergeCapabilities(context, channelContext);
+ 
 
   context[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
   context[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
