@@ -61,7 +61,7 @@ describe('#iopa-test()', function () {
         var server = stubServer.createServer(app.build())
        
          server.connect("urn://localhost").then(function (client) {
-            return client.fetch("/projector", "GET", function (context) {
+            return client["server.Fetch"]("/projector", "GET", function (context) {
                 context["server.RawStream"].end("HELLO WORLD " + seq++);
             });
         }).then(function(){

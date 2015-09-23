@@ -203,7 +203,7 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
 	channelResponse[SERVER.RawTransport] = channelContext[SERVER.RawTransport];
 	channelResponse[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
 	channelResponse[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
-  channelContext.disconnect = channelContext.dispose;
+  channelContext[SERVER.Disconnect] = channelContext.dispose;
 	
 	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
 

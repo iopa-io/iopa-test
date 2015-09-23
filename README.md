@@ -47,7 +47,7 @@ server.receive("TEST");
 // SIMULATE OUTBOUND REQUEST with MIRRORED RESPONSE 
 
 server.connect("urn://localhost").then(function (client) {
-      return client.fetch("/topic", "GET", function (context) {
+      return client[SERVER.Fetch]("/topic", "GET", function (context) {
           context["server.RawStream"].end("HELLO WORLD ");
       });
   });
