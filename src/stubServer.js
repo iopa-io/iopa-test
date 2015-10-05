@@ -141,7 +141,7 @@ StubServer.prototype.respond = function(parentContext){
         context[SERVER.LocalAddress] =parentResponse[SERVER.LocalAddress]
         context[SERVER.LocalPort] = parentResponse[SERVER.LocalPort] 
         context[SERVER.RawStream] =  new iopaStream.IncomingMessageStream();
-        context[SERVER.RawStream].append(parentContext[SERVER.RawTransport].toBuffer());
+        context[SERVER.RawStream].append(parentContext[SERVER.RawTransport].read());
         context[SERVER.RawStream].append("-MIRROR");
  
         context[SERVER.IsLocalOrigin] = parentResponse[SERVER.IsLocalOrigin]
