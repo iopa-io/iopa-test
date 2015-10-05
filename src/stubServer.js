@@ -264,13 +264,13 @@ function StubServer_Fetch(channelContext, path, options, prePipeline, postPipeli
    
    context[SERVER.ParentContext] = channelContext;
    context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-   
+   var that = this;
   return context.using(function () {
       if (prePipeline)
         prePipeline(context);
         
       var value = channelContext[SERVER.Dispatch](context);
-      
+      process.nextTick(function(){that.respond(context)});
       if (postPipeline)
         postPipeline(context);
         
