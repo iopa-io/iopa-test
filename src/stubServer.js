@@ -141,7 +141,7 @@ StubServer.prototype.respond = function(parentContext){
         context[SERVER.LocalAddress] =parentResponse[SERVER.LocalAddress]
         context[SERVER.LocalPort] = parentResponse[SERVER.LocalPort] 
         context[SERVER.RawStream] =  new iopaStream.IncomingMessageStream();
-        context[SERVER.RawStream].append(parentContext[SERVER.RawTransport].read());
+        context[SERVER.RawStream].append(parentContext[SERVER.RawTransport].toBuffer());
         context[SERVER.RawStream].append("-MIRROR");
  
         context[SERVER.IsLocalOrigin] = parentResponse[SERVER.IsLocalOrigin]
@@ -200,7 +200,7 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
 	channelContext[SERVER.Fetch] = StubServer_Fetch.bind(this, channelContext);
   channelContext[SERVER.Dispatch] = this._dispatch;
 	
-	channelContext[SERVER.RawStream] = new iopaStream.OutgoingStream();
+	channelContext[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
 	channelContext[SERVER.RawTransport] = channelContext[SERVER.RawStream];
 	channelContext[SERVER.LocalAddress] = "127.0.0.1";
 	channelContext[SERVER.LocalPort] = 80;
