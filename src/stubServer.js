@@ -82,7 +82,7 @@ module.exports.createServer = function(options, appFunc){return new StubServer(o
  * @returns {Promise(context)}
  * @public
  */
-StubServer.prototype.connect = function StubServer_connect(urlStr) {
+StubServer.prototype.connect = function StubServer_connect(urlStr, defaults) {
  
 };
 
@@ -101,9 +101,12 @@ StubServer.prototype.receive = function(buf){
 	context[SERVER.IsRequest] = true;
 	context[SERVER.SessionId] = context[SERVER.RemoteAddress] + ':' + context[SERVER.RemotePort];
 	context[IOPA.Scheme] = "urn:";
-   context[IOPA.MessageId] = context[IOPA.Seq];
+  context[IOPA.MessageId] = context[IOPA.Seq];
   context[IOPA.Body] = context[SERVER.RawStream];
  
+  context[SERVER.Fetch] = StubServer_Fetch.bind(this, context);
+  context[SERVER.Dispatch] = this._dispatch;
+	
 	var response = context.response;
 	response[SERVER.TLS] = context["server.TLS"];
 	response[SERVER.RemoteAddress] = context[SERVER.RemoteAddress];
@@ -116,6 +119,9 @@ StubServer.prototype.receive = function(buf){
 	response[IOPA.Scheme] = "urn:";
   response[IOPA.MessageId] = context[IOPA.MessageId];
   response[IOPA.Body] = response[SERVER.RawStream];
+  response[IOPA.Body].on("start", function(){
+     context[SERVER.Dispatch](response);
+  });
  	response[IOPA.Method] = "REPLY";
  	response[IOPA.StatusCode] = 200;
   response[IOPA.ReasonPhrase] = "OK";
@@ -221,10 +227,10 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
  * @returns Promise<null>
  * @public
  */
-function StubServer_Fetch(channelContext, path, options, pipeline) {
- 
+function StubServer_Fetch(channelContext, path, options, prePipeline, postPipeline) {
   if (typeof options === 'function') {
-    pipeline = options;
+    postPipeline = prePipeline;
+    prePipeline = options;
     options = {};
   }
   
@@ -258,13 +264,18 @@ function StubServer_Fetch(channelContext, path, options, pipeline) {
    
    context[SERVER.ParentContext] = channelContext;
    context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-   var that = this;
    
-  context.using(function(){
-      var value = channelContext[SERVER.Dispatch](context).then(pipeline);
-        process.nextTick(function(){that.respond(context)});
-        return value;
-  });
+  return context.using(function () {
+      if (prePipeline)
+        prePipeline(context);
+        
+      var value = channelContext[SERVER.Dispatch](context);
+      
+      if (postPipeline)
+        postPipeline(context);
+        
+      return value;
+    });
 };
 
 /**
