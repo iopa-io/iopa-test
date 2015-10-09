@@ -104,8 +104,8 @@ StubServer.prototype.receive = function(buf){
   context[IOPA.MessageId] = context[IOPA.Seq];
   context[IOPA.Body] = context[SERVER.RawStream];
  
-  context[SERVER.Fetch] = StubServer_Fetch.bind(this, context);
-  context[SERVER.Dispatch] = this._dispatch;
+  context.create = StubServer_create.bind(this, context);
+  context.dispatch = this._dispatch;
 	
 	var response = context.response;
 	response[SERVER.TLS] = context["server.TLS"];
@@ -120,7 +120,7 @@ StubServer.prototype.receive = function(buf){
   response[IOPA.MessageId] = context[IOPA.MessageId];
   response[IOPA.Body] = response[SERVER.RawStream];
   response[IOPA.Body].on("start", function(){
-     context[SERVER.Dispatch](response);
+     context.dispatch(response);
   });
  	response[IOPA.Method] = "REPLY";
  	response[IOPA.StatusCode] = 200;
@@ -167,7 +167,8 @@ StubServer.prototype.respond = function(parentContext){
         response[IOPA.Body] = response[SERVER.RawStream];
        
         context[SERVER.ParentContext] = parentContext;
-        context[SERVER.Fetch] = parentContext[SERVER.Fetch];
+        context.dispatch = parentContext.dispatch;
+        context.create = parentContext.create;
        
 			   var channelContext=parentContext[SERVER.ParentContext];
 	       channelContext[IOPA.Events].emit(IOPA.EVENTS.Response, context);
@@ -197,9 +198,9 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
   var channelContext = this._factory.createRequestResponse(urlStr, "CONNECT");
   var channelResponse = channelContext.response;
  
-	channelContext[SERVER.Fetch] = StubServer_Fetch.bind(this, channelContext);
-  channelContext[SERVER.Dispatch] = this._dispatch;
-	
+	channelContext.create = StubServer_create.bind(this, channelContext);
+  channelContext.dispatch = this._dispatch;
+
 	channelContext[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
 	channelContext[SERVER.RawTransport] = channelContext[SERVER.RawStream];
 	channelContext[SERVER.LocalAddress] = "127.0.0.1";
@@ -210,10 +211,9 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
 	channelResponse[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
 	channelResponse[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
   channelContext[SERVER.Disconnect] = channelContext.dispose;
-	
 	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
 
-   return this._connect(channelContext);
+  return this._connect(channelContext);
 };
 
 /**
@@ -227,20 +227,13 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
  * @returns Promise<null>
  * @public
  */
-function StubServer_Fetch(channelContext, path, options, prePipeline, postPipeline) {
-  if (typeof options === 'function') {
-    postPipeline = prePipeline;
-    prePipeline = options;
-    options = {};
-  }
-  
+function StubServer_create(channelContext, path, options) {
   var channelResponse = channelContext.response;
 
    var urlStr = channelContext[SERVER.OriginalUrl] + path;
   var context = channelContext[SERVER.Factory].createRequestResponse(urlStr, options);
   channelContext[SERVER.Factory].mergeCapabilities(context, channelContext);
  
-
   context[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
   context[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
   context[SERVER.RawStream] = channelContext[SERVER.RawStream];
@@ -254,7 +247,7 @@ function StubServer_Fetch(channelContext, path, options, prePipeline, postPipeli
   response[SERVER.LocalAddress] = channelResponse[SERVER.LocalAddress];
   response[SERVER.LocalPort] = channelResponse[SERVER.LocalPort];
   response[SERVER.RawStream] = channelResponse[SERVER.RawStream];
-     response[SERVER.RawTransport] = channelResponse[SERVER.RawTransport];
+  response[SERVER.RawTransport] = channelResponse[SERVER.RawTransport];
 
   response[SERVER.SessionId] = channelResponse[SERVER.SessionId];
   response[SERVER.ParentContext] = channelResponse;
@@ -262,26 +255,16 @@ function StubServer_Fetch(channelContext, path, options, prePipeline, postPipeli
   response[IOPA.Body] = response[SERVER.RawStream];
   response[IOPA.Method] = "REPLY";
    
-   context[SERVER.ParentContext] = channelContext;
-   context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-   var that = this;
- 
-    return context.using(function () {
-      if (prePipeline)
-        prePipeline(context);
-        
-      var value = channelContext[SERVER.Dispatch](context);
-        process.nextTick(function(){that.respond(context)});
-    
-      if (postPipeline)
-      return  value.then
-      (function(){
-          return postPipeline(context);
-      })
-        
-      else return value;
-    });
-};
+  context[SERVER.ParentContext] = channelContext;
+  context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
+  var that = this;
+  context.dispatch = function(){
+      process.nextTick(function(){that.respond(context)});
+      return channelContext.dispatch(context);
+  }
+  
+  return context;
+ };
 
 /**
  * server.close() Close IOPA Session 
