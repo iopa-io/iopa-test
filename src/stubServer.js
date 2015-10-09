@@ -54,8 +54,9 @@ function StubServer(options, appFunc) {
   this._factory = new iopa.Factory(options);
     
   this._appFunc = appFunc;
-  this._connect = this._appFunc.connect || function(context){return Promise.resolve(context)};
-  this._dispatch = this._appFunc.dispatch || function(context){return Promise.resolve(context)};
+  this._connectFunc = this._appFunc.connect || function(context){return Promise.resolve(context)};
+  this._createFunc = this._appFunc.create || function(context){return context};
+  this._dispatchFunc = this._appFunc.dispatch || function(context){return Promise.resolve(context)};
 }
 
 util.inherits(StubServer, EventEmitter);
@@ -105,7 +106,7 @@ StubServer.prototype.receive = function(buf){
   context[IOPA.Body] = context[SERVER.RawStream];
  
   context.create = StubServer_create.bind(this, context);
-  context.dispatch = this._dispatch;
+  context.dispatch = this._dispatchFunc;
 	
 	var response = context.response;
 	response[SERVER.TLS] = context["server.TLS"];
@@ -199,7 +200,7 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
   var channelResponse = channelContext.response;
  
 	channelContext.create = StubServer_create.bind(this, channelContext);
-  channelContext.dispatch = this._dispatch;
+  channelContext.dispatch = this._dispatchFunc;
 
 	channelContext[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
 	channelContext[SERVER.RawTransport] = channelContext[SERVER.RawStream];
@@ -213,7 +214,7 @@ StubServer.prototype.connect = function TcpClient_connect(urlStr) {
   channelContext[SERVER.Disconnect] = channelContext.dispose;
 	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
 
-  return this._connect(channelContext);
+  return this._connectFunc(channelContext);
 };
 
 /**
@@ -263,7 +264,7 @@ function StubServer_create(channelContext, path, options) {
       return channelContext.dispatch(context);
   }
   
-  return context;
+  return this._createFunc(context);
  };
 
 /**
