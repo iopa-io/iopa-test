@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Internet of Protocols Alliance (IOPA)
+ * Copyright (c) 2016 Internet of Protocols Alliance (IOPA)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ StubServer.prototype.receive = function(buf){
 	response[SERVER.RemotePort] = context[SERVER.RemotePort];
 	response[SERVER.LocalAddress] = context[SERVER.LocalAddress];
 	response[SERVER.LocalPort] = context[SERVER.LocalPort];
-	response[SERVER.RawStream] = new iopaStream.OutgoingStream();
+	response[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
 	response[SERVER.IsLocalOrigin] = true;
 	response[SERVER.IsRequest] = false;
 	response[IOPA.Scheme] = "urn:";
@@ -128,6 +128,8 @@ StubServer.prototype.receive = function(buf){
   response[IOPA.ReasonPhrase] = "OK";
 	
 	context.using(this._appFunc);
+    
+    return context;
 }
 
 StubServer.prototype.respond = function(parentContext){ 
