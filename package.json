@@ -16,7 +16,8 @@
     "url": "https://github.com/iopa-io/iopa-test.git"
   },
   "dependencies": {
-    "iopa": "^1.3.0",
+    "iopa": "^1.4.0",
+    "iopa-rest": "^1.4.0",
     "iopa-common-stream": "^1.3.0"
   },
   "keywords": [
