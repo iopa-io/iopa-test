@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const iopa = require('iopa'),
+const iopa = require('iopa-rest'),
      iopaStream = require('iopa-common-stream');
    
 const  constants = iopa.constants,
