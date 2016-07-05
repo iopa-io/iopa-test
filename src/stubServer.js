@@ -15,268 +15,231 @@
  */
 
 const iopa = require('iopa-rest'),
-     iopaStream = require('iopa-common-stream');
-   
-const  constants = iopa.constants,
+  constants = iopa.constants,
   IOPA = constants.IOPA,
   SERVER = constants.SERVER
+
+const iopaStream = require('iopa-common-stream');
 
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
-/* *********************************************************
- * IOPA STUB SERVER / CLIENT WITH MIDDLEWARE PIPELINES
- * ********************************************************* */
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 /**
- * StubServer includes IOPA Client
- * 
- * @class StubServer
- * @param {object} options  
- * @param {appFunc} appFunc  Server callback in IOPA AppFunc format
- * @constructor
- */
-function StubServer(options, appFunc) {
-  
-    _classCallCheck(this, StubServer);
-    
-  if (typeof options === 'function') {
-     appFunc = options;
-     
-    if (appFunc.hasOwnProperty("properties"))
-      options = appFunc.properties
-    else 
-      options = {};
-  }
-    
-  EventEmitter.call(this);
-  this._factory = new iopa.Factory(options);
-    
-  this._appFunc = appFunc;
-  this._connectFunc = this._appFunc.connect || function(context){return Promise.resolve(context)};
-  this._createFunc = this._appFunc.create || function(context){return context};
-  this._dispatchFunc = this._appFunc.dispatch || function(context){return Promise.resolve(context)};
-}
-
-util.inherits(StubServer, EventEmitter);
-
-/**
- * server.Listen()  Begin accepting connections using the specified arguments. 
- * 
- * @method listen
- * @returns promise completes when listening
- * @public 
- */
-StubServer.prototype.listen = function StubServer_listen() {
-   return true;
-};
-
-module.exports.createServer = function(options, appFunc){return new StubServer(options, appFunc);}
-
-/**
- * server.connect() Create IOPA Session to given Host and Port
+ * Representes Stub Server
  *
- * @method connect
- * @this IOPAServer IopaServer instance
- * @parm {string} urlStr url representation of Request scheme://127.0.0.1/hello
- * @returns {Promise(context)}
+ * @class StubServer
+ * @param app  IOPA AppBuilder App
+ * @constructor
  * @public
  */
-StubServer.prototype.connect = function StubServer_connect(urlStr, defaults) {
- 
+function StubServer(app) {
+  _classCallCheck(this, StubServer);
+
+  this._app = app;
+
+  app.createServer = this.createServer_.bind(this, app.createServer || function () { throw new Error("no registered transport provider"); });
+}
+
+/**
+ * @method listen
+ * Create socket and bind to local port to listen for incoming requests
+ *
+ * @param {Object} Options dictionary that includes port num, address string
+ * @returns {Promise} 
+ * @public
+ */
+StubServer.prototype.createServer_ = function StubServer_createServer(next, scheme, options) {
+  if (scheme != "stub:")
+    return next(scheme, options)
+
+  options = options || {};
+
+  if (!this._app.properties[SERVER.IsBuilt])
+    this._app.build();
+  var server = {};
+
+  server.listen = this.listen_.bind(this, server);
+  server.connect = function (url) {
+    return this._app.dispatch(
+      this._app.createContext(url,
+        {
+          "response": true,
+          [IOPA.Method]: IOPA.METHODS.connect,
+          [SERVER.RawStream]: "NOT USED IN STUB SERVER"
+        }
+      ));
+  }.bind(this);
+  server.close = this.close_.bind(this, server);
+
+  server.receive = function (method, url, body) {
+    return server.connect("urn://localhost").then(function (client) {
+      var context = client.create(url, method);
+      return context.send(body)
+    })
+  };
+
+  return server;
 };
 
-StubServer.prototype.receive = function(buf){
-	var context = this._factory.createContext();
-	context[IOPA.Method] = "GET";
-	
-	context[SERVER.TLS] = false;
-	context[SERVER.RemoteAddress] = "remote";
-	context[SERVER.RemotePort] = 80;
-	context[SERVER.LocalAddress] = "127.0.0.1";
-	context[SERVER.LocalPort] = 80;
-	context[SERVER.RawStream] = new iopaStream.IncomingMessageStream();
-	context[SERVER.RawStream].append(buf);
-	context[SERVER.IsLocalOrigin] = false;
-	context[SERVER.IsRequest] = true;
-	context[SERVER.SessionId] = context[SERVER.RemoteAddress] + ':' + context[SERVER.RemotePort];
-	context[IOPA.Scheme] = "urn:";
-  context[IOPA.MessageId] = context[IOPA.Seq];
-  context[IOPA.Body] = context[SERVER.RawStream];
- 
-  context.create = StubServer_create.bind(this, context);
-  context.dispatch = this._dispatchFunc;
-	
-	var response = context.response;
-	response[SERVER.TLS] = context["server.TLS"];
-	response[SERVER.RemoteAddress] = context[SERVER.RemoteAddress];
-	response[SERVER.RemotePort] = context[SERVER.RemotePort];
-	response[SERVER.LocalAddress] = context[SERVER.LocalAddress];
-	response[SERVER.LocalPort] = context[SERVER.LocalPort];
-	response[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
-	response[SERVER.IsLocalOrigin] = true;
-	response[SERVER.IsRequest] = false;
-	response[IOPA.Scheme] = "urn:";
-  response[IOPA.MessageId] = context[IOPA.MessageId];
-  response[IOPA.Body] = response[SERVER.RawStream];
-  response[IOPA.Body].on("start", function(){
-     context.dispatch(response);
+/**
+ * @method listen_
+ * Create socket and bind to local port to listen for incoming requests
+ *
+ * @param {Object} Options dictionary that includes port num, address string
+ * @returns {Promise} 
+ * @public
+ */
+StubServer.prototype.listen_ = function StubServer_listen(server, options) {
+  options = options || {};
+
+  var port = options.port || options[IOPA.LocalPort] || 0;
+  var address = options.address || options[IOPA.LocalAddress] || '0.0.0.0';
+
+  server.port = port;
+  server.address = address;
+
+  return new Promise(function (resolve, reject) {
+    resolve(server);
   });
- 	response[IOPA.Method] = "REPLY";
+};
+
+StubServer.prototype.receiveConnect = function StubServer_receive(connectContext) {
+  var context = this._app.Factory.createContext();
+
+  context[IOPA.Method] = connectContext[IOPA.Method]
+  context[SERVER.RemoteAddress] = connectContext[SERVER.LocalAddress] || "stubremotehost";
+  context[SERVER.RemotePort] = connectContext[SERVER.LocalPort] || connectContext[SERVER.RemotePort];
+  context[SERVER.LocalAddress] = connectContext[SERVER.RemoteAddress];
+  context[SERVER.LocalPort] = connectContext[SERVER.RemotePort];
+  context[SERVER.RawStream] = "NOT USED IN STUBSERVER";
+  context[SERVER.IsLocalOrigin] = !connectContext[SERVER.IsLocalOrigin];
+  context[SERVER.IsRequest] = connectContext[SERVER.IsRequest];
+  context[SERVER.SessionId] = context[SERVER.RemoteAddress] + ':' + context[SERVER.RemotePort];
+  context[IOPA.Scheme] = "urn:";
+  context[IOPA.MessageId] = context[IOPA.Seq];
+
+  connectContext[SERVER.RawTransport] = { "stub": context };
+
+  context.using(this._app.invoke.bind(this._app));
+};
+
+StubServer.prototype.receiveContext = function StubServer_receive(channelContext, remoteContext) {
+  var self = this;
+  var context = channelContext.create();
+  var response = context.addResponse();
+
+  context[SERVER.RemoteAddress] = channelContext[SERVER.RemoteAddress];
+  context[SERVER.RemotePort] = channelContext[SERVER.RemotePort]
+  context[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress]
+  context[SERVER.LocalPort] = channelContext[SERVER.LocalPort]
+  context[SERVER.IsLocalOrigin] = !remoteContext[SERVER.IsLocalOrigin];
+  context[SERVER.IsRequest] = remoteContext[SERVER.IsRequest];
+  context[SERVER.SessionId] = context[SERVER.RemoteAddress] + ':' + context[SERVER.RemotePort];
+  context[IOPA.Scheme] = remoteContext[IOPA.Scheme];
+  context[IOPA.MessageId] = context[IOPA.Seq];
+  context[IOPA.Body] = new iopaStream.IncomingMessageStream();
+  var buf = remoteContext[IOPA.Body].toBuffer();
+  context[IOPA.Body].append(buf);
+
+  response[SERVER.RemoteAddress] = context[SERVER.RemoteAddress];
+  response[SERVER.RemotePort] = context[SERVER.RemotePort];
+  response[SERVER.LocalAddress] = context[SERVER.LocalAddress];
+  response[SERVER.LocalPort] = context[SERVER.LocalPort];
+  response[SERVER.IsLocalOrigin] = !context[SERVER.IsLocalOrigin];
+  response[SERVER.IsRequest] = ![SERVER.IsRequest];
+  response[IOPA.Scheme] = context[IOPA.Scheme];
+  response[IOPA.MessageId] = context[IOPA.MessageId];
+  response[IOPA.Body] = new iopaStream.OutgoingMessageStream();
+  response[IOPA.Body].on("finish", function () {
+    self.receiveContext(remoteContext[SERVER.RawTransport].stub, response);
+    context.dispose();
+  });
  	response[IOPA.StatusCode] = 200;
   response[IOPA.ReasonPhrase] = "OK";
-	
-	context.using(this._appFunc);
-    
-    return context;
-}
 
-StubServer.prototype.respond = function(parentContext){ 
-	  var parentResponse = parentContext.response;
-  
-        var context = this._factory.createContext();
-        parentContext[SERVER.Factory].mergeCapabilities(context, parentContext);
- 
-        context[SERVER.TLS] = parentResponse[SERVER.TLS];
-        context[SERVER.RemoteAddress] =parentResponse[SERVER.RemoteAddress];
-        context[SERVER.RemotePort] = parentResponse[SERVER.RemotePort]
-        context[SERVER.LocalAddress] =parentResponse[SERVER.LocalAddress]
-        context[SERVER.LocalPort] = parentResponse[SERVER.LocalPort] 
-        context[SERVER.RawStream] =  new iopaStream.IncomingMessageStream();
-        context[SERVER.RawStream].append(parentContext[SERVER.RawTransport].toBuffer());
-        context[SERVER.RawStream].append("-MIRROR");
- 
-        context[SERVER.IsLocalOrigin] = parentResponse[SERVER.IsLocalOrigin]
-        context[SERVER.IsRequest] = parentResponse[SERVER.IsRequest] ;
-        context[SERVER.SessionId] = parentResponse[SERVER.SessionId];
-        context[IOPA.MessageId] = context[IOPA.Seq];
-        context[IOPA.Body] = context[SERVER.RawStream];
-        context[IOPA.Method] = "REPLY";
-        context[IOPA.StatusCode] = 200;
-        context[IOPA.ReasonPhrase] = "OK";
-        
-        var response = context.response;
-        response[SERVER.TLS] = parentContext[SERVER.TLS];
-        response[SERVER.RemoteAddress] = parentContext[SERVER.RemoteAddress];
-        response[SERVER.RemotePort] = parentContext[SERVER.RemotePort];
-        response[SERVER.LocalAddress] = parentContext[SERVER.LocalAddress];
-        response[SERVER.LocalPort] = parentContext[SERVER.LocalPort];
-        response[SERVER.RawStream] = new iopaStream.OutgoingStream;
-         response[SERVER.RawTransport] = response[SERVER.RawStream];
-        response[SERVER.IsLocalOrigin] =  parentContext[SERVER.IsLocalOrigin]
-        response[SERVER.IsRequest] = parentContext[SERVER.IsRequest]
-        response[IOPA.MessageId] = response[IOPA.Seq];
-        response[IOPA.Body] = response[SERVER.RawStream];
-       
-        context[SERVER.ParentContext] = parentContext;
-        context.dispatch = parentContext.dispatch;
-        context.create = parentContext.create;
-       
-			   var channelContext=parentContext[SERVER.ParentContext];
-	       channelContext[IOPA.Events].emit(IOPA.EVENTS.Response, context);
-		context.dispose();
-}
+  if (context[SERVER.IsRequest])
+    channelContext[IOPA.Events].emit(IOPA.EVENTS.Request, context)
+  else
+    channelContext[IOPA.Events].emit(IOPA.EVENTS.Response, context)
+};
 
 /**
- * server.connect() Create IOPA Session to given Host and Port
- *
- * @method connect
- * @this IOPAServer IopaServer instance
- * @parm {string} urlStr url representation of Request scheme://127.0.0.1/hello
- * @returns {Promise(context)}
- * @public
- */
-/**
-* Creates a new IOPA Request using a Tcp Url including host and port name
+* Dispatches a Stub Request 
 *
-* @method connect
+* @method dispatch
 
 * @parm {object} options not used
 * @parm {string} urlStr url representation of ://127.0.0.1:8200
 * @public
 * @constructor
 */
-StubServer.prototype.connect = function TcpClient_connect(urlStr) {
-  var channelContext = this._factory.createRequestResponse(urlStr, "CONNECT");
-  var channelResponse = channelContext.response;
- 
-	channelContext.create = StubServer_create.bind(this, channelContext);
-  channelContext.dispatch = this._dispatchFunc;
+StubServer.prototype.dispatch = function StubServer_dispatch(channelContext, next) {
 
-	channelContext[SERVER.RawStream] = new iopaStream.OutgoingMessageStream();
-	channelContext[SERVER.RawTransport] = channelContext[SERVER.RawStream];
-	channelContext[SERVER.LocalAddress] = "127.0.0.1";
-	channelContext[SERVER.LocalPort] = 80;
-	
-	channelResponse[SERVER.RawStream] = new iopaStream.IncomingMessageStream();
-	channelResponse[SERVER.RawTransport] = channelContext[SERVER.RawTransport];
-	channelResponse[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
-	channelResponse[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
-  channelContext[SERVER.Disconnect] = channelContext.dispose;
-	channelContext[SERVER.SessionId] = channelContext[SERVER.LocalAddress] + ":" + channelContext[SERVER.LocalPort] + "-" + channelContext[SERVER.RemoteAddress] + ":" + channelContext[SERVER.RemotePort];
+  channelContext.create = this.create.bind(this, channelContext, channelContext.create);
+  channelContext[SERVER.LocalAddress] = "stubClient";
+  channelContext[SERVER.LocalPort] = 10000;
+  var self = this;
+  setTimeout(this.receiveConnect.bind(this, channelContext), 0);
+  return new Promise(function (resolve, reject) {
+    setTimeout(resolve.bind(this, channelContext), 20);
+  });
 
-  return this._connectFunc(channelContext);
+  //ignore next
 };
 
-/**
- * Fetches a new IOPA Request using a Tcp Url including host and port name
- *
- * @method fetch
 
- * @param path string representation of ://127.0.0.1/hello
- * @param options object dictionary to override defaults
- * @param pipeline function(context):Promise  to call with context record
- * @returns Promise<null>
+/**
+ * Creates a new IOPA Context that is a child request/response of a parent Context
+ *
+ * @method create
+ *
+ * @param parentContext IOPA Context for parent
+ * @param url string representation of /hello to add to parent url
+ * @param options object 
+ * @returns context
  * @public
  */
-function StubServer_create(channelContext, path, options) {
-  var channelResponse = channelContext.response;
+StubServer.prototype.create = function PipelineMatch_create(parentContext, next, url, options) {
+  var self = this;
 
-   var urlStr = channelContext[SERVER.OriginalUrl] + path;
-  var context = channelContext[SERVER.Factory].createRequestResponse(urlStr, options);
-  channelContext[SERVER.Factory].mergeCapabilities(context, channelContext);
- 
-  context[SERVER.LocalAddress] = channelContext[SERVER.LocalAddress];
-  context[SERVER.LocalPort] = channelContext[SERVER.LocalPort];
-  context[SERVER.RawStream] = channelContext[SERVER.RawStream];
-  context[SERVER.RawTransport] = channelContext[SERVER.RawTransport];
-  context[SERVER.SessionId] = channelContext[SERVER.SessionId];
-  context[IOPA.MessageId] = context[IOPA.Seq];
-  context[IOPA.Body] = context[SERVER.RawStream];
-  context[IOPA.Method] = "REPLY";
- 
-  var response = context.response;
-  response[SERVER.LocalAddress] = channelResponse[SERVER.LocalAddress];
-  response[SERVER.LocalPort] = channelResponse[SERVER.LocalPort];
-  response[SERVER.RawStream] = channelResponse[SERVER.RawStream];
-  response[SERVER.RawTransport] = channelResponse[SERVER.RawTransport];
+  var context = next(url, options);
+  context[SERVER.IsRequest] = true;
+  context[IOPA.Method] = "GET";
+  context[IOPA.Headers]['Server'] = "io.iopa.stub";
+  context[IOPA.Body] = new iopaStream.OutgoingMessageStream();
+  context[SERVER.RawTransport] = { "stub": parentContext };
 
-  response[SERVER.SessionId] = channelResponse[SERVER.SessionId];
-  response[SERVER.ParentContext] = channelResponse;
-  response[IOPA.MessageId] = context[IOPA.MessageId] ;
-  response[IOPA.Body] = response[SERVER.RawStream];
-  response[IOPA.Method] = "REPLY";
-   
-  context[SERVER.ParentContext] = channelContext;
-  context[SERVER.Capabilities] = channelContext[SERVER.Capabilities];
-  var that = this;
-  context.dispatch = function(){
-      process.nextTick(function(){that.respond(context)});
-      return channelContext.dispatch(context);
-  }
-  
-  return this._createFunc(context);
- };
+  context[IOPA.Body].on("finish", function () {
+    self.receiveContext(parentContext[SERVER.RawTransport].stub, context);
+  });
+
+  return context;
+}
 
 /**
- * server.close() Close IOPA Session 
- *
  * @method close
- * @this IOPAServer IopaServer instance
+ * Close the underlying socket and stop listening for data on it.
+ * 
  * @returns {Promise()}
  * @public
  */
-StubServer.prototype.close = function StubServer_close() {
-   
+StubServer.prototype.close_ = function StubServer_close(server) {
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      resolve(null);
+    }, 200)
+  });
 };
+
+module.exports = StubServer;
+
+
+StubServer.continue = function (channelContext, next) {
+  channelContext["iopa.Events"].on("request", function (context) {
+    next.invoke(context);
+  });
+
+  return new Promise(function (resolve, reject) { });
+}
