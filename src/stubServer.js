@@ -76,7 +76,7 @@ StubServer.prototype.createServer_ = function StubServer_createServer(next, sche
   server.receive = function (method, url, body) {
     return server.connect("urn://localhost").then(function (client) {
       var context = client.create(url, method);
-      return context.send(body)
+      return context["iopa.Body"].end(body)
     })
   };
 

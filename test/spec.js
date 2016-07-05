@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-global.Promise = require('bluebird');
+// global.Promise = require('bluebird');
 
 const index = require('../index.js'),
     stubServer = index.stubServer;
@@ -33,45 +33,46 @@ describe('#iopa-test()', function () {
     it('should simulate incoming messages', function (done) {
 
         var app = new iopa.App();
+        app.use(stubServer);
+        app.use(stubServer.continue);
 
          app.use(function (context, next) {
-            context.response["server.RawStream"].end("HELLO WORLD " + seq++);
+            context.response["iopa.Body"].end("HELLO WORLD " + seq++);
             return next();
         });
 
-        var server = stubServer.createServer(app.build())
+        var server = app.createServer("stub:")
    
-         server.receive("TEST");
-         process.nextTick(function(){
+         server.receive("GET", "/", "TEST");
+         setTimeout(function(){
                 seq.should.equal(1);
                 done();
-            });
+            }, 40);
 
     })
     
-   /*  it('should simulate outgoing messages', function (done) {
+    it('should simulate outgoing messages', function (done) {
 
         var app = new iopa.App();
+        app.use(stubServer);
+        app.use(stubServer.continue);
 
          app.use(function (context, next) {
-            context.response["server.RawStream"].end("HELLO WORLD " + seq++);
+            context.response["iopa.Body"].end("HELLO WORLD " + seq++);
             return next();
         });
-
-        var server = stubServer.createServer(app.build())
-  
+ 
+         var server = app.createServer("stub:");
+   
          server.connect("urn://localhost").then(function (client) {
-            return client.create("/projector", "GET").fn(function (context) {
-                context["server.RawStream"].end("HELLO WORLD " + seq++);
-                return context;
-            }).dispatch();
-        }).then(function(){
+            var context = client.create("/projector", "GET");
+            context["iopa.Body"].end("HELLO WORLD " + seq++);
             process.nextTick(function(){
-                seq.should.equal(2);
+                seq.should.equal(3);
                 done();
             });
         }) 
 
 
-    })*/
+    })
 });
